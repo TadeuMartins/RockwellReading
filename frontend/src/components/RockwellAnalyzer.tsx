@@ -19,10 +19,12 @@ const RockwellAnalyzer = () => {
   const [l5kFile, setL5kFile] = useState<File | null>(null);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [data, setData] = useState<DataRow[]>([]);
+  const [rawData, setRawData] = useState<any[]>([]); // Store original backend data for CSV export
+  const [columnOrder, setColumnOrder] = useState<string[]>([]); // Store exact column order from backend
   const [processing, setProcessing] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
-    alarmType: 'all',
+    alarmTypes: [] as string[], // Changed to array for multiple selection
     enabledStatus: 'all',
     hasInterlock: 'all'
   });
@@ -81,6 +83,9 @@ const RockwellAnalyzer = () => {
           unit: row.Unit || '',
         }));
         
+        // Store original data for CSV export with exact column names and order
+        setRawData(result.data);
+        setColumnOrder(result.columns || Object.keys(result.data[0] || {}));
         setData(mappedData);
         
         // Success message
@@ -120,8 +125,8 @@ const RockwellAnalyzer = () => {
         if (!matchesSearch) return false;
       }
 
-      // Filtro de tipo de alarme
-      if (filters.alarmType !== 'all' && item.ioName !== filters.alarmType) {
+      // Filtro de tipo de alarme (seleção múltipla)
+      if (filters.alarmTypes.length > 0 && !filters.alarmTypes.includes(item.ioName)) {
         return false;
       }
 
@@ -152,11 +157,47 @@ const RockwellAnalyzer = () => {
     };
   }, [filteredData]);
 
-  // Download CSV
-  const downloadCSV = () => {
+  // Download CSV - Formato Original (backend format with exact column names)
+  const downloadOriginalCSV = () => {
+    if (filteredData.length === 0 || rawData.length === 0) return;
+
+    // Create a set of IDs from filtered data for lookup
+    const filteredIds = new Set(filteredData.map(row => row.id));
+    
+    // Filter raw data based on filtered IDs (id is index + 1)
+    const filteredRawData = rawData.filter((_, index) => filteredIds.has(index + 1));
+    
+    if (filteredRawData.length === 0) return;
+
+    // Use the exact column order from backend to preserve original CSV structure
+    const headers = columnOrder.length > 0 ? columnOrder : Object.keys(filteredRawData[0]);
+    
+    // Build CSV with original column names in exact order
+    const csv = [
+      headers.join(';'),
+      ...filteredRawData.map(row => 
+        headers.map(header => {
+          const value = row[header];
+          // Handle null/undefined values
+          return value !== null && value !== undefined ? value : '';
+        }).join(';')
+      )
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'rockwell_processado.csv';
+    link.click();
+  };
+
+  // Download CSV - Vista Frontend (as displayed in the UI)
+  const downloadViewCSV = () => {
     if (filteredData.length === 0) return;
 
-    const headers = ['Hierarc', 'Chart', 'Block', 'I/O Name', 'Block Type', 'Value', 'Signal', 'Interlock', 'Identification', 'Unit'];
+    // Headers as displayed in frontend (Portuguese)
+    const headers = ['Hierarc', 'Chart', 'Block', 'Alarme', 'Valor', 'Status', 'Interbloqueio', 'Identification', 'Unit'];
+    
     const csv = [
       headers.join(';'),
       ...filteredData.map(row => [
@@ -164,10 +205,9 @@ const RockwellAnalyzer = () => {
         row.chart,
         row.block,
         row.ioName,
-        row.blockType,
         row.value,
-        row.signal,
-        row.interlock,
+        row.signal === 1 ? 'Habilitado' : 'Desabilitado',
+        row.interlock || '',
         row.identification,
         row.unit
       ].join(';'))
@@ -176,7 +216,7 @@ const RockwellAnalyzer = () => {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = 'rockwell_analysis_filtered.csv';
+    link.download = 'rockwell_visualizacao.csv';
     link.click();
   };
 
@@ -345,20 +385,43 @@ const RockwellAnalyzer = () => {
                   </div>
                 </div>
 
-                {/* Alarm Type */}
+                {/* Alarm Type - Multiple Selection */}
                 <div>
                   <label className="block text-slate-400 text-sm mb-2">Tipo de Alarme</label>
-                  <select
-                    value={filters.alarmType}
-                    onChange={(e) => setFilters({...filters, alarmType: e.target.value})}
-                    className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="all">Todos</option>
-                    <option value="HHInAlarm">HH Alarm</option>
-                    <option value="HInAlarm">H Alarm</option>
-                    <option value="LInAlarm">L Alarm</option>
-                    <option value="LLInAlarm">LL Alarm</option>
-                  </select>
+                  <div className="bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white">
+                    <div className="space-y-2">
+                      {[
+                        { value: 'HHInAlarm', label: 'HH Alarm', color: 'text-red-400' },
+                        { value: 'HInAlarm', label: 'H Alarm', color: 'text-orange-400' },
+                        { value: 'LInAlarm', label: 'L Alarm', color: 'text-yellow-400' },
+                        { value: 'LLInAlarm', label: 'LL Alarm', color: 'text-blue-400' }
+                      ].map(({ value, label, color }) => (
+                        <label key={value} className="flex items-center gap-2 cursor-pointer hover:bg-slate-800 rounded px-2 py-1">
+                          <input
+                            type="checkbox"
+                            checked={filters.alarmTypes.includes(value)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFilters({...filters, alarmTypes: [...filters.alarmTypes, value]});
+                              } else {
+                                setFilters({...filters, alarmTypes: filters.alarmTypes.filter(t => t !== value)});
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                          />
+                          <span className={`text-sm ${color}`}>{label}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {filters.alarmTypes.length > 0 && (
+                      <button
+                        onClick={() => setFilters({...filters, alarmTypes: []})}
+                        className="mt-2 text-xs text-slate-400 hover:text-white transition-colors"
+                      >
+                        Limpar seleção
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Enabled Status */}
@@ -391,14 +454,21 @@ const RockwellAnalyzer = () => {
               </div>
             </div>
 
-            {/* Download Button */}
-            <div className="flex justify-end mb-4">
+            {/* Download Buttons */}
+            <div className="flex justify-end gap-3 mb-4">
               <button
-                onClick={downloadCSV}
+                onClick={downloadOriginalCSV}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Exportar CSV Original ({stats.total})
+              </button>
+              <button
+                onClick={downloadViewCSV}
                 className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
               >
                 <Download className="w-4 h-4" />
-                Exportar Resultados ({stats.total})
+                Exportar Vista Atual ({stats.total})
               </button>
             </div>
 
