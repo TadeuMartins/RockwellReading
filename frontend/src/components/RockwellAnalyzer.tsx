@@ -44,13 +44,26 @@ const RockwellAnalyzer = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Erro ao processar arquivos');
+        const errorText = await response.text();
+        let errorMessage = 'Erro ao processar arquivos';
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.error || errorMessage;
+        } catch {
+          // If response is not JSON, use the text directly
+          if (errorText) errorMessage = errorText;
+        }
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
       
       if (result.success) {
         // Mapeia os dados do backend para o formato esperado pelo frontend
+        if (!result.data || !Array.isArray(result.data)) {
+          throw new Error('Resposta do servidor em formato inválido');
+        }
+        
         const mappedData = result.data.map((row: any, index: number) => ({
           id: index + 1,
           block: row.Block || '',
@@ -63,12 +76,22 @@ const RockwellAnalyzer = () => {
         }));
         
         setData(mappedData);
+        
+        // Success message
+        console.log(`✓ Processamento concluído com sucesso: ${mappedData.length} registros`);
       } else {
-        alert('Erro ao processar: ' + result.error);
+        throw new Error(result.error || 'Erro desconhecido no processamento');
       }
     } catch (error) {
-      console.error('Erro:', error);
-      alert('Erro ao conectar com o servidor. Certifique-se de que o backend está rodando em http://localhost:5000');
+      console.error('Erro detalhado:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      
+      // More specific error message
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
+        alert('Erro ao conectar com o servidor. Certifique-se de que o backend está rodando em http://localhost:5000');
+      } else {
+        alert('Erro ao processar os arquivos: ' + errorMessage);
+      }
     } finally {
       setProcessing(false);
     }
