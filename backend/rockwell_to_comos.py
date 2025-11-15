@@ -10,7 +10,10 @@ enriquecido com:
 - Habilitação dos alarmes (HHEnabled / HEnabled / LEnabled / LLEnabled) em "Signal"
 - Equipamento interbloqueado em "Text 0", baseado na lógica Ladder.
 
-Uso:
+Uso como API:
+    python rockwell_to_comos.py
+    
+Uso como CLI (legado):
     python rockwell_to_comos.py CLP01_ETM.L5K CLP01_ETM.csv CLP01_ETM_enriquecido.csv
 """
 
@@ -18,9 +21,13 @@ import re
 import math
 import argparse
 import collections
+import sys
+import io
 from typing import Dict, List, Tuple, Set
 
 import pandas as pd
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 
 # ----------------------------
@@ -319,15 +326,11 @@ def decode_enables_for_instance(inst_name: str,
 # Enriquecendo o CSV
 # ----------------------------
 
-def enrich_csv(l5k_path: str,
-               csv_in_path: str,
-               csv_out_path: str) -> None:
-    # Carrega arquivos
-    with open(l5k_path, encoding="latin-1") as f:
-        l5k_text = f.read()
-
-    df = pd.read_csv(csv_in_path, sep=';', encoding='latin-1')
-
+def process_data(l5k_text: str, df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Processa o dataframe com base no conteúdo L5K.
+    Retorna o dataframe enriquecido.
+    """
     # AOIs de alarme que queremos tratar
     alarm_aoi_types = ["IHMALMA", "IHMALMA_2780"]
 
@@ -389,8 +392,86 @@ def enrich_csv(l5k_path: str,
         if tags:
             df_out.at[idx, "Text 0"] = " / ".join(tags)
 
+    return df_out
+
+
+def enrich_csv(l5k_path: str,
+               csv_in_path: str,
+               csv_out_path: str) -> None:
+    """
+    Função legada para uso via CLI.
+    Carrega arquivos, processa e salva o resultado.
+    """
+    # Carrega arquivos
+    with open(l5k_path, encoding="latin-1") as f:
+        l5k_text = f.read()
+
+    df = pd.read_csv(csv_in_path, sep=';', encoding='latin-1')
+    
+    df_out = process_data(l5k_text, df)
+
     # Salva no mesmo formato separador ';'
     df_out.to_csv(csv_out_path, sep=';', index=False, encoding='latin-1')
+
+
+# ----------------------------
+# Flask API
+# ----------------------------
+
+app = Flask(__name__)
+CORS(app)
+
+
+@app.route('/api/health', methods=['GET'])
+def health():
+    """Endpoint de verificação de saúde da API"""
+    return jsonify({"status": "ok", "message": "Rockwell to COMOS API está rodando"})
+
+
+@app.route('/api/process', methods=['POST'])
+def process():
+    """
+    Endpoint para processar arquivos L5K e CSV.
+    Espera dois arquivos: 'l5k_file' e 'csv_file'
+    Retorna o CSV processado como JSON
+    """
+    try:
+        # Verifica se ambos os arquivos foram enviados
+        if 'l5k_file' not in request.files or 'csv_file' not in request.files:
+            return jsonify({
+                "error": "Ambos os arquivos (l5k_file e csv_file) são necessários"
+            }), 400
+
+        l5k_file = request.files['l5k_file']
+        csv_file = request.files['csv_file']
+
+        # Lê o conteúdo do arquivo L5K
+        l5k_text = l5k_file.read().decode('latin-1')
+
+        # Lê o CSV
+        csv_content = csv_file.read().decode('latin-1')
+        df = pd.read_csv(io.StringIO(csv_content), sep=';')
+
+        # Processa os dados
+        df_out = process_data(l5k_text, df)
+
+        # Converte para formato JSON amigável
+        # Substitui NaN por None para JSON
+        df_json = df_out.where(pd.notnull(df_out), None)
+        
+        result = {
+            "success": True,
+            "data": df_json.to_dict(orient='records'),
+            "total_rows": len(df_out)
+        }
+
+        return jsonify(result)
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 
 # ----------------------------
@@ -398,6 +479,23 @@ def enrich_csv(l5k_path: str,
 # ----------------------------
 
 def main():
+    # Se não há argumentos, inicia o servidor Flask
+    if len(sys.argv) == 1:
+        print("=" * 60)
+        print("Rockwell to COMOS - Servidor API")
+        print("=" * 60)
+        print("\nServidor iniciando em http://localhost:5000")
+        print("\nEndpoints disponíveis:")
+        print("  GET  /api/health  - Verificação de saúde")
+        print("  POST /api/process - Processar arquivos L5K e CSV")
+        print("\nPara usar via linha de comando:")
+        print("  python rockwell_to_comos.py <arquivo.L5K> <arquivo.csv> <saida.csv>")
+        print("\nPressione CTRL+C para parar o servidor")
+        print("=" * 60)
+        app.run(host='0.0.0.0', port=5000, debug=True)
+        return
+
+    # Modo CLI legado
     parser = argparse.ArgumentParser(
         description="Enriquece CSV COMOS com limites, enables e interbloqueios a partir de um L5K Rockwell."
     )
