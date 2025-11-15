@@ -354,6 +354,10 @@ def process_data(l5k_text: str, df: pd.DataFrame) -> pd.DataFrame:
     }
 
     df_out = df.copy()
+    
+    # Ensure "Text 0" column has object dtype to avoid FutureWarning when assigning strings
+    if "Text 0" in df_out.columns:
+        df_out["Text 0"] = df_out["Text 0"].astype(object)
 
     for idx, row in df_out.iterrows():
         block_type = str(row.get("Block type", ""))
