@@ -1,10 +1,21 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Upload, FileText, AlertCircle, CheckCircle, XCircle, Filter, Download, Search, Activity } from 'lucide-react';
 
+interface DataRow {
+  id: number;
+  block: string;
+  ioName: string;
+  blockType: string;
+  value: number;
+  signal: number;
+  interlock: string;
+  chart: string;
+}
+
 const RockwellAnalyzer = () => {
-  const [l5kFile, setL5kFile] = useState(null);
-  const [csvFile, setCsvFile] = useState(null);
-  const [data, setData] = useState([]);
+  const [l5kFile, setL5kFile] = useState<File | null>(null);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [data, setData] = useState<DataRow[]>([]);
   const [processing, setProcessing] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
@@ -139,7 +150,7 @@ const RockwellAnalyzer = () => {
                 type="file"
                 accept=".l5k,.L5K"
                 className="hidden"
-                onChange={(e) => setL5kFile(e.target.files[0])}
+                onChange={(e) => setL5kFile(e.target.files?.[0] || null)}
               />
               <FileText className="w-16 h-16 text-blue-400 mb-4 group-hover:scale-110 transition-transform" />
               <h3 className="text-xl font-semibold text-white mb-2">Arquivo L5K</h3>
@@ -162,7 +173,7 @@ const RockwellAnalyzer = () => {
                 type="file"
                 accept=".csv,.CSV"
                 className="hidden"
-                onChange={(e) => setCsvFile(e.target.files[0])}
+                onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
               />
               <FileText className="w-16 h-16 text-green-400 mb-4 group-hover:scale-110 transition-transform" />
               <h3 className="text-xl font-semibold text-white mb-2">Arquivo CSV Base</h3>
