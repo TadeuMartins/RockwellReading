@@ -442,22 +442,28 @@ def process():
     try:
         # Verifica se ambos os arquivos foram enviados
         if 'l5k_file' not in request.files or 'csv_file' not in request.files:
+            print("❌ Erro: Arquivos não fornecidos")
             return jsonify({
                 "error": "Ambos os arquivos (l5k_file e csv_file) são necessários"
             }), 400
 
         l5k_file = request.files['l5k_file']
         csv_file = request.files['csv_file']
+        
+        print(f"📁 Processando: {l5k_file.filename} + {csv_file.filename}")
 
         # Lê o conteúdo do arquivo L5K
         l5k_text = l5k_file.read().decode('latin-1')
+        print(f"  L5K: {len(l5k_text)} caracteres lidos")
 
         # Lê o CSV
         csv_content = csv_file.read().decode('latin-1')
         df = pd.read_csv(io.StringIO(csv_content), sep=';')
+        print(f"  CSV: {len(df)} linhas lidas")
 
         # Processa os dados
         df_out = process_data(l5k_text, df)
+        print(f"  Processado: {len(df_out)} linhas de saída")
 
         # Converte para formato JSON amigável
         # Substitui NaN por None para JSON
@@ -468,10 +474,15 @@ def process():
             "data": df_json.to_dict(orient='records'),
             "total_rows": len(df_out)
         }
+        
+        print(f"✓ Sucesso: {result['total_rows']} registros retornados")
 
         return jsonify(result)
 
     except Exception as e:
+        print(f"❌ Erro no processamento: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             "success": False,
             "error": str(e)
