@@ -1,6 +1,6 @@
 # Backend - Rockwell to COMOS Converter
 
-Este é o backend do sistema de análise de arquivos Rockwell, responsável por converter arquivos L5K e CSV para o formato COMOS enriquecido.
+Este é o backend do sistema de análise de arquivos Rockwell, responsável por converter arquivos L5K e CSV para o formato COMOS enriquecido. Funciona como uma **API REST Flask** ou via **linha de comando**.
 
 ## Requisitos
 
@@ -21,13 +21,91 @@ pip install -r requirements.txt
 
 ## Uso
 
-Execute o script de conversão com os seguintes parâmetros:
+### Modo 1: API Server (Recomendado)
+
+Execute o script **sem argumentos** para iniciar o servidor Flask:
+
+```bash
+python rockwell_to_comos.py
+```
+
+O servidor iniciará em `http://localhost:5000` e exibirá:
+
+```
+============================================================
+Rockwell to COMOS - Servidor API
+============================================================
+
+Servidor iniciando em http://localhost:5000
+
+Endpoints disponíveis:
+  GET  /api/health  - Verificação de saúde
+  POST /api/process - Processar arquivos L5K e CSV
+
+Para usar via linha de comando:
+  python rockwell_to_comos.py <arquivo.L5K> <arquivo.csv> <saida.csv>
+
+Pressione CTRL+C para parar o servidor
+============================================================
+```
+
+#### Endpoints da API
+
+##### `GET /api/health`
+Verifica se a API está funcionando.
+
+**Resposta:**
+```json
+{
+  "status": "ok",
+  "message": "Rockwell to COMOS API está rodando"
+}
+```
+
+##### `POST /api/process`
+Processa arquivos L5K e CSV.
+
+**Parâmetros (multipart/form-data):**
+- `l5k_file`: Arquivo L5K (arquivo Rockwell)
+- `csv_file`: Arquivo CSV base (formato COMOS)
+
+**Resposta de sucesso:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "Block": "TE1611001_ALM",
+      "I/O name": "HHInAlarm",
+      "Block type": "ADD_ON_INSTRUCTIONIHMALMA_2780",
+      "Value": 85.5,
+      "Signal": 1,
+      "Text 0": "M1611001_MTR / XV1611001",
+      "Chart": "R_Control_Bombas"
+    },
+    ...
+  ],
+  "total_rows": 12
+}
+```
+
+**Resposta de erro:**
+```json
+{
+  "success": false,
+  "error": "Mensagem de erro"
+}
+```
+
+### Modo 2: Linha de Comando (Legado)
+
+Execute o script com os seguintes parâmetros:
 
 ```bash
 python rockwell_to_comos.py <arquivo_L5K> <arquivo_CSV_base> <arquivo_CSV_saida>
 ```
 
-### Exemplo:
+#### Exemplo:
 ```bash
 python rockwell_to_comos.py CLP01_ETM.L5K CLP01_ETM.csv CLP01_ETM_enriquecido.csv
 ```
@@ -35,11 +113,30 @@ python rockwell_to_comos.py CLP01_ETM.L5K CLP01_ETM.csv CLP01_ETM_enriquecido.cs
 ## Funcionalidades
 
 O script converte um arquivo L5K Rockwell + CSV base no formato COMOS para um CSV enriquecido com:
-- Valor real dos limites (HHLimit / HLimit / LLimit / LLLimit) em "Value"
-- Habilitação dos alarmes (HHEnabled / HEnabled / LEnabled / LLEnabled) em "Signal"
-- Equipamento interbloqueado em "Text 0", baseado na lógica Ladder
+- **Valor real dos limites** (HHLimit / HLimit / LLimit / LLLimit) em "Value"
+- **Habilitação dos alarmes** (HHEnabled / HEnabled / LEnabled / LLEnabled) em "Signal"
+- **Equipamento interbloqueado** em "Text 0", baseado na lógica Ladder
+
+## Integração com Frontend
+
+Para usar com o frontend React:
+
+1. Inicie o servidor API:
+   ```bash
+   python rockwell_to_comos.py
+   ```
+
+2. O frontend (rodando em `http://localhost:3000`) se conectará automaticamente ao backend em `http://localhost:5000`
+
+3. O frontend enviará arquivos via POST para `/api/process` e exibirá os resultados
 
 ## Estrutura
 
-- `rockwell_to_comos.py` - Script principal de conversão
+- `rockwell_to_comos.py` - Script principal (API + CLI)
 - `requirements.txt` - Dependências Python
+
+## Dependências
+
+- `pandas>=2.0.0` - Manipulação de dados
+- `flask>=3.0.0` - Framework web
+- `flask-cors>=4.0.0` - Suporte CORS para chamadas do frontend
