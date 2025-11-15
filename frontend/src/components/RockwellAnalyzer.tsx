@@ -20,6 +20,7 @@ const RockwellAnalyzer = () => {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [data, setData] = useState<DataRow[]>([]);
   const [rawData, setRawData] = useState<any[]>([]); // Store original backend data for CSV export
+  const [columnOrder, setColumnOrder] = useState<string[]>([]); // Store exact column order from backend
   const [processing, setProcessing] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
@@ -82,8 +83,9 @@ const RockwellAnalyzer = () => {
           unit: row.Unit || '',
         }));
         
-        // Store original data for CSV export with exact column names
+        // Store original data for CSV export with exact column names and order
         setRawData(result.data);
+        setColumnOrder(result.columns || Object.keys(result.data[0] || {}));
         setData(mappedData);
         
         // Success message
@@ -157,7 +159,7 @@ const RockwellAnalyzer = () => {
 
   // Download CSV
   const downloadCSV = () => {
-    if (filteredData.length === 0) return;
+    if (filteredData.length === 0 || rawData.length === 0) return;
 
     // Create a set of IDs from filtered data for lookup
     const filteredIds = new Set(filteredData.map(row => row.id));
@@ -167,10 +169,10 @@ const RockwellAnalyzer = () => {
     
     if (filteredRawData.length === 0) return;
 
-    // Get column names from the first row of raw data (preserves exact backend column names)
-    const headers = Object.keys(filteredRawData[0]);
+    // Use the exact column order from backend to preserve original CSV structure
+    const headers = columnOrder.length > 0 ? columnOrder : Object.keys(filteredRawData[0]);
     
-    // Build CSV with original column names
+    // Build CSV with original column names in exact order
     const csv = [
       headers.join(';'),
       ...filteredRawData.map(row => 

@@ -487,6 +487,7 @@ def process():
         result = {
             "success": True,
             "data": df_json.to_dict(orient='records'),
+            "columns": df_out.columns.tolist(),  # Preserva a ordem exata das colunas
             "total_rows": len(df_out)
         }
         
