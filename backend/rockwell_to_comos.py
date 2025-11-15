@@ -481,8 +481,8 @@ def process():
         print(f"  Processado: {len(df_out)} linhas de saída")
 
         # Converte para formato JSON amigável
-        # Substitui NaN por None para JSON
-        df_json = df_out.where(pd.notnull(df_out), None)
+        # Substitui NaN por None para JSON (converte para object type primeiro para garantir compatibilidade)
+        df_json = df_out.astype(object).where(pd.notnull(df_out), None)
         
         result = {
             "success": True,
