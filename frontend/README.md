@@ -86,13 +86,30 @@ npm run preview
   - Alarmes com interbloqueios
   - Breakdown por tipo (HH/H/L/LL)
 - ✅ **Filtros avançados**:
-  - Busca de texto livre
+  - Busca de texto livre (busca em todos os campos)
   - Tipo de alarme
   - Status de habilitação
   - Presença de interlocks
 - ✅ **Exportação de dados** filtrados em formato CSV
 - ✅ **Interface responsiva** e moderna com Tailwind CSS
 - ✅ **Tema escuro profissional** com gradientes e animações
+- ✅ **Tabela expandida** com 9 colunas de dados:
+  - Hierarc (hierarquia)
+  - Chart (gráfico/área)
+  - Block (tag do alarme)
+  - Alarme (tipo: HH/H/L/LL)
+  - Valor (limite do alarme)
+  - Status (habilitado/desabilitado)
+  - Interbloqueio (equipamentos afetados)
+  - Identification (identificação)
+  - Unit (unidade de medida)
+
+### Melhorias de Tratamento de Erros 🛡️
+
+- **Mensagens de erro específicas**: Não mostra mais "erro de conexão" genérico
+- **Validação de resposta**: Verifica estrutura dos dados antes de processar
+- **Logs no console**: Informações detalhadas para debugging
+- **Diferenciação de erros**: Separa erros de rede de erros de processamento
 
 ## Estrutura do Projeto
 
@@ -149,9 +166,27 @@ Durante o desenvolvimento, o Vite oferece:
 
 **Problema:** Erro "Erro ao conectar com o servidor"
 - **Solução:** Verifique se o backend está rodando em `http://localhost:5000`
+- Execute `curl http://localhost:5000/api/health` para testar a conexão
+
+**Problema:** Erro "Erro ao processar os arquivos: [mensagem específica]"
+- **Solução:** Leia a mensagem de erro específica que indica o problema real
+- Verifique os logs do backend no terminal para mais detalhes
+- Problemas comuns:
+  - Formato de arquivo inválido
+  - CSV sem colunas esperadas
+  - L5K sem definições de AOI esperadas
 
 **Problema:** Estilos não aparecem
 - **Solução:** Execute `npm run build` para garantir que o Tailwind está compilando corretamente
 
-**Problema:** Arquivos não são processados
-- **Solução:** Verifique os logs do backend e certifique-se de que os arquivos estão no formato correto
+**Problema:** Arquivos não são processados corretamente
+- **Solução:** 
+  - Verifique os logs do backend (devem mostrar 📁 e ✓)
+  - O backend agora suporta diferentes separadores CSV (; , ou tab)
+  - Verifique se as colunas do CSV têm os nomes esperados (Block, I/O name, Block type, etc.)
+  
+**Problema:** Tabela vazia após processamento bem-sucedido
+- **Solução:**
+  - Verifique no console do navegador (F12) se há mensagens de erro
+  - O processamento deve mostrar "✓ Processamento concluído com sucesso: X registros"
+  - Verifique se o CSV contém linhas de alarme (HHInAlarm, HInAlarm, etc.)

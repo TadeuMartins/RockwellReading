@@ -117,6 +117,32 @@ O script converte um arquivo L5K Rockwell + CSV base no formato COMOS para um CS
 - **Habilitação dos alarmes** (HHEnabled / HEnabled / LEnabled / LLEnabled) em "Signal"
 - **Equipamento interbloqueado** em "Text 0", baseado na lógica Ladder
 
+### Melhorias de Robustez 🛡️
+
+O backend agora possui recursos avançados de processamento para lidar com diferentes formatos de arquivos:
+
+#### 1. **Detecção Automática de Separador CSV**
+- Tenta automaticamente três tipos de separadores: `;` (ponto e vírgula), `,` (vírgula) e `\t` (tab)
+- Elimina problemas de compatibilidade entre diferentes ferramentas de exportação
+- Logs mostram qual separador foi detectado
+
+#### 2. **Tratamento de Espaços em Nomes de Colunas**
+- Remove espaços extras no início e fim dos nomes das colunas
+- Evita erros de leitura causados por `"Block type "` vs `"Block type"`
+
+#### 3. **Correspondência Flexível de Block Type**
+- Busca por substring ao invés de correspondência exata
+- Aceita variações como:
+  - `"IHMALMA"`
+  - `"ADD_ON_INSTRUCTIONIHMALMA"`
+  - `"ADD_ON_INSTRUCTION IHMALMA"` (com espaço)
+  - `"ADD_ON_INSTRUCTIONIHMALMA_2780"`
+
+#### 4. **Logs Detalhados para Debugging**
+- Emoji indicators (📁 ✓ ❌) para facilitar visualização
+- Informações sobre arquivos processados, tamanho, separadores detectados
+- Stack traces completos em caso de erro
+
 ## Integração com Frontend
 
 Para usar com o frontend React:

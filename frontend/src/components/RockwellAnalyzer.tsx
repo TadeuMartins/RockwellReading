@@ -3,13 +3,16 @@ import { Upload, FileText, AlertCircle, CheckCircle, XCircle, Filter, Download, 
 
 interface DataRow {
   id: number;
+  hierarc: string;
+  chart: string;
   block: string;
   ioName: string;
   blockType: string;
   value: number;
   signal: number;
   interlock: string;
-  chart: string;
+  identification: string;
+  unit: string;
 }
 
 const RockwellAnalyzer = () => {
@@ -44,31 +47,57 @@ const RockwellAnalyzer = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Erro ao processar arquivos');
+        const errorText = await response.text();
+        let errorMessage = 'Erro ao processar arquivos';
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.error || errorMessage;
+        } catch {
+          // If response is not JSON, use the text directly
+          if (errorText) errorMessage = errorText;
+        }
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
       
       if (result.success) {
         // Mapeia os dados do backend para o formato esperado pelo frontend
+        if (!result.data || !Array.isArray(result.data)) {
+          throw new Error('Resposta do servidor em formato inválido');
+        }
+        
         const mappedData = result.data.map((row: any, index: number) => ({
           id: index + 1,
+          hierarc: row.Hierarc || '',
+          chart: row.Chart || '',
           block: row.Block || '',
           ioName: row['I/O name'] || '',
           blockType: row['Block type'] || '',
           value: row.Value !== null && row.Value !== undefined ? row.Value : 0,
           signal: row.Signal !== null && row.Signal !== undefined ? row.Signal : 0,
           interlock: row['Text 0'] || '',
-          chart: row.Chart || '',
+          identification: row.Identification || '',
+          unit: row.Unit || '',
         }));
         
         setData(mappedData);
+        
+        // Success message
+        console.log(`✓ Processamento concluído com sucesso: ${mappedData.length} registros`);
       } else {
-        alert('Erro ao processar: ' + result.error);
+        throw new Error(result.error || 'Erro desconhecido no processamento');
       }
     } catch (error) {
-      console.error('Erro:', error);
-      alert('Erro ao conectar com o servidor. Certifique-se de que o backend está rodando em http://localhost:5000');
+      console.error('Erro detalhado:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      
+      // More specific error message
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
+        alert('Erro ao conectar com o servidor. Certifique-se de que o backend está rodando em http://localhost:5000');
+      } else {
+        alert('Erro ao processar os arquivos: ' + errorMessage);
+      }
     } finally {
       setProcessing(false);
     }
@@ -84,7 +113,10 @@ const RockwellAnalyzer = () => {
           item.block.toLowerCase().includes(searchLower) ||
           item.ioName.toLowerCase().includes(searchLower) ||
           item.interlock.toLowerCase().includes(searchLower) ||
-          item.chart.toLowerCase().includes(searchLower);
+          item.chart.toLowerCase().includes(searchLower) ||
+          item.hierarc.toLowerCase().includes(searchLower) ||
+          item.identification.toLowerCase().includes(searchLower) ||
+          item.unit.toLowerCase().includes(searchLower);
         if (!matchesSearch) return false;
       }
 
@@ -124,17 +156,20 @@ const RockwellAnalyzer = () => {
   const downloadCSV = () => {
     if (filteredData.length === 0) return;
 
-    const headers = ['Block', 'I/O Name', 'Block Type', 'Value', 'Signal', 'Interlock', 'Chart'];
+    const headers = ['Hierarc', 'Chart', 'Block', 'I/O Name', 'Block Type', 'Value', 'Signal', 'Interlock', 'Identification', 'Unit'];
     const csv = [
       headers.join(';'),
       ...filteredData.map(row => [
+        row.hierarc,
+        row.chart,
         row.block,
         row.ioName,
         row.blockType,
         row.value,
         row.signal,
         row.interlock,
-        row.chart
+        row.identification,
+        row.unit
       ].join(';'))
     ].join('\n');
 
@@ -373,18 +408,22 @@ const RockwellAnalyzer = () => {
                 <table className="w-full">
                   <thead className="bg-slate-900">
                     <tr>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Hierarc</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Chart</th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Block</th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Alarme</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Tipo</th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Valor</th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Interbloqueio</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Chart</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Identification</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Unit</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700">
                     {filteredData.map((row) => (
                       <tr key={row.id} className="hover:bg-slate-750 transition-colors">
+                        <td className="px-6 py-4 text-sm text-slate-300">{row.hierarc}</td>
+                        <td className="px-6 py-4 text-sm text-slate-400">{row.chart}</td>
                         <td className="px-6 py-4 text-sm font-medium text-white">{row.block}</td>
                         <td className="px-6 py-4 text-sm">
                           <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
@@ -396,7 +435,6 @@ const RockwellAnalyzer = () => {
                             {row.ioName}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-slate-300">{row.blockType}</td>
                         <td className="px-6 py-4 text-sm text-slate-300 font-mono">{row.value}</td>
                         <td className="px-6 py-4 text-sm">
                           {row.signal === 1 ? (
@@ -414,7 +452,8 @@ const RockwellAnalyzer = () => {
                         <td className="px-6 py-4 text-sm text-slate-300">
                           {row.interlock || <span className="text-slate-500 italic">Nenhum</span>}
                         </td>
-                        <td className="px-6 py-4 text-sm text-slate-400">{row.chart}</td>
+                        <td className="px-6 py-4 text-sm text-slate-300">{row.identification}</td>
+                        <td className="px-6 py-4 text-sm text-slate-400">{row.unit}</td>
                       </tr>
                     ))}
                   </tbody>
