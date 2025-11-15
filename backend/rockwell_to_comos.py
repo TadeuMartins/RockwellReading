@@ -355,6 +355,9 @@ def process_data(l5k_text: str, df: pd.DataFrame) -> pd.DataFrame:
 
     df_out = df.copy()
     
+    # Remove espaços extras dos nomes das colunas
+    df_out.columns = df_out.columns.str.strip()
+    
     # Ensure "Text 0" column has object dtype to avoid FutureWarning when assigning strings
     if "Text 0" in df_out.columns:
         df_out["Text 0"] = df_out["Text 0"].astype(object)
@@ -362,9 +365,8 @@ def process_data(l5k_text: str, df: pd.DataFrame) -> pd.DataFrame:
     for idx, row in df_out.iterrows():
         block_type = str(row.get("Block type", ""))
 
-        # Só mexe nos blocos de alarme
-        if block_type not in ("ADD_ON_INSTRUCTIONIHMALMA",
-                              "ADD_ON_INSTRUCTIONIHMALMA_2780"):
+        # Verificação flexível: verifica se contém IHMALMA ou IHMALMA_2780
+        if not any(aoi in block_type for aoi in alarm_aoi_types):
             continue
 
         io_name = str(row.get("I/O name", ""))
@@ -456,10 +458,23 @@ def process():
         l5k_text = l5k_file.read().decode('latin-1')
         print(f"  L5K: {len(l5k_text)} caracteres lidos")
 
-        # Lê o CSV
+        # Lê o CSV com tentativa de múltiplos separadores
         csv_content = csv_file.read().decode('latin-1')
-        df = pd.read_csv(io.StringIO(csv_content), sep=';')
-        print(f"  CSV: {len(df)} linhas lidas")
+        df = None
+        separators = [';', ',', '\t']
+        
+        for sep in separators:
+            try:
+                df = pd.read_csv(io.StringIO(csv_content), sep=sep)
+                # Verifica se conseguiu ler colunas válidas
+                if len(df.columns) > 1:
+                    print(f"  CSV: Separador '{sep}' detectado, {len(df)} linhas, {len(df.columns)} colunas")
+                    break
+            except Exception as e:
+                continue
+        
+        if df is None or len(df.columns) <= 1:
+            raise ValueError("Não foi possível detectar o formato do CSV. Tente usar separadores ; , ou tab")
 
         # Processa os dados
         df_out = process_data(l5k_text, df)
