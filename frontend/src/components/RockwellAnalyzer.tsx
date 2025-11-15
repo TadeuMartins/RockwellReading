@@ -24,7 +24,7 @@ const RockwellAnalyzer = () => {
     hasInterlock: 'all'
   });
 
-  // Simula processamento dos arquivos
+  // Processa os arquivos via API backend
   const processFiles = async () => {
     if (!l5kFile || !csvFile) {
       alert('Por favor, selecione ambos os arquivos');
@@ -33,27 +33,45 @@ const RockwellAnalyzer = () => {
 
     setProcessing(true);
     
-    // Simula delay de processamento
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Dados de exemplo para demonstração
-    const sampleData = [
-      { id: 1, block: 'TE1611001_ALM', ioName: 'HHInAlarm', blockType: 'IHMALMA_2780', value: 85.5, signal: 1, interlock: 'M1611001_MTR / XV1611001', chart: 'R_Control_Bombas' },
-      { id: 2, block: 'TE1611001_ALM', ioName: 'HInAlarm', blockType: 'IHMALMA_2780', value: 80.0, signal: 1, interlock: '', chart: 'R_Control_Bombas' },
-      { id: 3, block: 'TE1611001_ALM', ioName: 'LInAlarm', blockType: 'IHMALMA_2780', value: 20.0, signal: 0, interlock: '', chart: 'R_Control_Bombas' },
-      { id: 4, block: 'TE1611001_ALM', ioName: 'LLInAlarm', blockType: 'IHMALMA_2780', value: 15.0, signal: 1, interlock: 'M1611001_MTR', chart: 'R_Control_Bombas' },
-      { id: 5, block: 'PT1611002_ALM', ioName: 'HHInAlarm', blockType: 'IHMALMA', value: 120.5, signal: 1, interlock: 'XV1611002 / PMP1611001', chart: 'R_Valvulas' },
-      { id: 6, block: 'PT1611002_ALM', ioName: 'HInAlarm', blockType: 'IHMALMA', value: 110.0, signal: 1, interlock: '', chart: 'R_Valvulas' },
-      { id: 7, block: 'PT1611002_ALM', ioName: 'LInAlarm', blockType: 'IHMALMA', value: 30.0, signal: 1, interlock: 'XV1611003', chart: 'R_Valvulas' },
-      { id: 8, block: 'PT1611002_ALM', ioName: 'LLInAlarm', blockType: 'IHMALMA', value: 20.0, signal: 0, interlock: '', chart: 'R_Valvulas' },
-      { id: 9, block: 'FT1611003_ALM', ioName: 'HHInAlarm', blockType: 'IHMALMA_2780', value: 95.0, signal: 1, interlock: 'M1611002_MTR', chart: 'R_Tanques' },
-      { id: 10, block: 'FT1611003_ALM', ioName: 'HInAlarm', blockType: 'IHMALMA_2780', value: 85.0, signal: 0, interlock: '', chart: 'R_Tanques' },
-      { id: 11, block: 'LT1611004_ALM', ioName: 'HHInAlarm', blockType: 'IHMALMA', value: 8.5, signal: 1, interlock: 'PMP1611002 / XV1611004', chart: 'R_Tanques' },
-      { id: 12, block: 'LT1611004_ALM', ioName: 'LLInAlarm', blockType: 'IHMALMA', value: 1.5, signal: 1, interlock: 'M1611003_MTR', chart: 'R_Tanques' },
-    ];
-    
-    setData(sampleData);
-    setProcessing(false);
+    try {
+      const formData = new FormData();
+      formData.append('l5k_file', l5kFile);
+      formData.append('csv_file', csvFile);
+
+      const response = await fetch('/api/process', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao processar arquivos');
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        // Mapeia os dados do backend para o formato esperado pelo frontend
+        const mappedData = result.data.map((row: any, index: number) => ({
+          id: index + 1,
+          block: row.Block || '',
+          ioName: row['I/O name'] || '',
+          blockType: row['Block type'] || '',
+          value: row.Value !== null && row.Value !== undefined ? row.Value : 0,
+          signal: row.Signal !== null && row.Signal !== undefined ? row.Signal : 0,
+          interlock: row['Text 0'] || '',
+          chart: row.Chart || '',
+        }));
+        
+        setData(mappedData);
+      } else {
+        alert('Erro ao processar: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Erro:', error);
+      alert('Erro ao conectar com o servidor. Certifique-se de que o backend está rodando em http://localhost:5000');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   // Dados filtrados
