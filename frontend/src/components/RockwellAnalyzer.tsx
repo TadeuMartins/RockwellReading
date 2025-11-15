@@ -24,7 +24,7 @@ const RockwellAnalyzer = () => {
   const [processing, setProcessing] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
-    alarmType: 'all',
+    alarmTypes: [] as string[], // Changed to array for multiple selection
     enabledStatus: 'all',
     hasInterlock: 'all'
   });
@@ -125,8 +125,8 @@ const RockwellAnalyzer = () => {
         if (!matchesSearch) return false;
       }
 
-      // Filtro de tipo de alarme
-      if (filters.alarmType !== 'all' && item.ioName !== filters.alarmType) {
+      // Filtro de tipo de alarme (seleção múltipla)
+      if (filters.alarmTypes.length > 0 && !filters.alarmTypes.includes(item.ioName)) {
         return false;
       }
 
@@ -385,20 +385,43 @@ const RockwellAnalyzer = () => {
                   </div>
                 </div>
 
-                {/* Alarm Type */}
+                {/* Alarm Type - Multiple Selection */}
                 <div>
                   <label className="block text-slate-400 text-sm mb-2">Tipo de Alarme</label>
-                  <select
-                    value={filters.alarmType}
-                    onChange={(e) => setFilters({...filters, alarmType: e.target.value})}
-                    className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="all">Todos</option>
-                    <option value="HHInAlarm">HH Alarm</option>
-                    <option value="HInAlarm">H Alarm</option>
-                    <option value="LInAlarm">L Alarm</option>
-                    <option value="LLInAlarm">LL Alarm</option>
-                  </select>
+                  <div className="bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white">
+                    <div className="space-y-2">
+                      {[
+                        { value: 'HHInAlarm', label: 'HH Alarm', color: 'text-red-400' },
+                        { value: 'HInAlarm', label: 'H Alarm', color: 'text-orange-400' },
+                        { value: 'LInAlarm', label: 'L Alarm', color: 'text-yellow-400' },
+                        { value: 'LLInAlarm', label: 'LL Alarm', color: 'text-blue-400' }
+                      ].map(({ value, label, color }) => (
+                        <label key={value} className="flex items-center gap-2 cursor-pointer hover:bg-slate-800 rounded px-2 py-1">
+                          <input
+                            type="checkbox"
+                            checked={filters.alarmTypes.includes(value)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFilters({...filters, alarmTypes: [...filters.alarmTypes, value]});
+                              } else {
+                                setFilters({...filters, alarmTypes: filters.alarmTypes.filter(t => t !== value)});
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                          />
+                          <span className={`text-sm ${color}`}>{label}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {filters.alarmTypes.length > 0 && (
+                      <button
+                        onClick={() => setFilters({...filters, alarmTypes: []})}
+                        className="mt-2 text-xs text-slate-400 hover:text-white transition-colors"
+                      >
+                        Limpar seleção
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Enabled Status */}
