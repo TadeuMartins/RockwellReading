@@ -19,6 +19,7 @@ const RockwellAnalyzer = () => {
   const [l5kFile, setL5kFile] = useState<File | null>(null);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [data, setData] = useState<DataRow[]>([]);
+  const [rawData, setRawData] = useState<any[]>([]); // Store original backend data for CSV export
   const [processing, setProcessing] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
@@ -81,6 +82,8 @@ const RockwellAnalyzer = () => {
           unit: row.Unit || '',
         }));
         
+        // Store original data for CSV export with exact column names
+        setRawData(result.data);
         setData(mappedData);
         
         // Success message
@@ -156,21 +159,27 @@ const RockwellAnalyzer = () => {
   const downloadCSV = () => {
     if (filteredData.length === 0) return;
 
-    const headers = ['Hierarc', 'Chart', 'Block', 'I/O Name', 'Block Type', 'Value', 'Signal', 'Interlock', 'Identification', 'Unit'];
+    // Create a set of IDs from filtered data for lookup
+    const filteredIds = new Set(filteredData.map(row => row.id));
+    
+    // Filter raw data based on filtered IDs (id is index + 1)
+    const filteredRawData = rawData.filter((_, index) => filteredIds.has(index + 1));
+    
+    if (filteredRawData.length === 0) return;
+
+    // Get column names from the first row of raw data (preserves exact backend column names)
+    const headers = Object.keys(filteredRawData[0]);
+    
+    // Build CSV with original column names
     const csv = [
       headers.join(';'),
-      ...filteredData.map(row => [
-        row.hierarc,
-        row.chart,
-        row.block,
-        row.ioName,
-        row.blockType,
-        row.value,
-        row.signal,
-        row.interlock,
-        row.identification,
-        row.unit
-      ].join(';'))
+      ...filteredRawData.map(row => 
+        headers.map(header => {
+          const value = row[header];
+          // Handle null/undefined values
+          return value !== null && value !== undefined ? value : '';
+        }).join(';')
+      )
     ].join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
