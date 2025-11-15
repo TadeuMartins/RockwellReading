@@ -157,8 +157,8 @@ const RockwellAnalyzer = () => {
     };
   }, [filteredData]);
 
-  // Download CSV
-  const downloadCSV = () => {
+  // Download CSV - Formato Original (backend format with exact column names)
+  const downloadOriginalCSV = () => {
     if (filteredData.length === 0 || rawData.length === 0) return;
 
     // Create a set of IDs from filtered data for lookup
@@ -187,7 +187,36 @@ const RockwellAnalyzer = () => {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = 'rockwell_analysis_filtered.csv';
+    link.download = 'rockwell_processado.csv';
+    link.click();
+  };
+
+  // Download CSV - Vista Frontend (as displayed in the UI)
+  const downloadViewCSV = () => {
+    if (filteredData.length === 0) return;
+
+    // Headers as displayed in frontend (Portuguese)
+    const headers = ['Hierarc', 'Chart', 'Block', 'Alarme', 'Valor', 'Status', 'Interbloqueio', 'Identification', 'Unit'];
+    
+    const csv = [
+      headers.join(';'),
+      ...filteredData.map(row => [
+        row.hierarc,
+        row.chart,
+        row.block,
+        row.ioName,
+        row.value,
+        row.signal === 1 ? 'Habilitado' : 'Desabilitado',
+        row.interlock || '',
+        row.identification,
+        row.unit
+      ].join(';'))
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'rockwell_visualizacao.csv';
     link.click();
   };
 
@@ -402,14 +431,21 @@ const RockwellAnalyzer = () => {
               </div>
             </div>
 
-            {/* Download Button */}
-            <div className="flex justify-end mb-4">
+            {/* Download Buttons */}
+            <div className="flex justify-end gap-3 mb-4">
               <button
-                onClick={downloadCSV}
+                onClick={downloadOriginalCSV}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Exportar CSV Original ({stats.total})
+              </button>
+              <button
+                onClick={downloadViewCSV}
                 className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
               >
                 <Download className="w-4 h-4" />
-                Exportar Resultados ({stats.total})
+                Exportar Vista Atual ({stats.total})
               </button>
             </div>
 

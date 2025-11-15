@@ -412,7 +412,7 @@ def enrich_csv(l5k_path: str,
     with open(l5k_path, encoding="latin-1") as f:
         l5k_text = f.read()
 
-    df = pd.read_csv(csv_in_path, sep=';', encoding='latin-1')
+    df = pd.read_csv(csv_in_path, sep=';', encoding='latin-1', index_col=False)
     
     df_out = process_data(l5k_text, df)
 
@@ -465,7 +465,7 @@ def process():
         
         for sep in separators:
             try:
-                df = pd.read_csv(io.StringIO(csv_content), sep=sep)
+                df = pd.read_csv(io.StringIO(csv_content), sep=sep, index_col=False)
                 # Verifica se conseguiu ler colunas válidas
                 if len(df.columns) > 1:
                     print(f"  CSV: Separador '{sep}' detectado, {len(df)} linhas, {len(df.columns)} colunas")
