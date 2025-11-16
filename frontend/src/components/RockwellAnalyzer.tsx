@@ -24,7 +24,7 @@ const RockwellAnalyzer = () => {
   const [processing, setProcessing] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
-    alarmTypes: [] as string[], // Changed to array for multiple selection
+    alarmType: 'all', // Changed to single selection dropdown
     enabledStatus: 'all',
     hasInterlock: 'all'
   });
@@ -125,9 +125,17 @@ const RockwellAnalyzer = () => {
         if (!matchesSearch) return false;
       }
 
-      // Filtro de tipo de alarme (seleção múltipla)
-      if (filters.alarmTypes.length > 0 && !filters.alarmTypes.includes(item.ioName)) {
-        return false;
+      // Filtro de tipo de alarme (seleção única)
+      if (filters.alarmType !== 'all') {
+        if (filters.alarmType === 'others') {
+          // "Outros" mostra itens que NÃO são dos tipos Limit
+          const limitTypes = ['HHInAlarm', 'HInAlarm', 'LInAlarm', 'LLInAlarm'];
+          if (limitTypes.includes(item.ioName)) {
+            return false;
+          }
+        } else if (item.ioName !== filters.alarmType) {
+          return false;
+        }
       }
 
       // Filtro de status habilitado
@@ -145,6 +153,7 @@ const RockwellAnalyzer = () => {
   // Estatísticas
   const stats = useMemo(() => {
     const filtered = filteredData;
+    const limitTypes = ['HHInAlarm', 'HInAlarm', 'LInAlarm', 'LLInAlarm'];
     return {
       total: filtered.length,
       enabled: filtered.filter(d => d.signal === 1).length,
@@ -154,6 +163,7 @@ const RockwellAnalyzer = () => {
       hAlarms: filtered.filter(d => d.ioName === 'HInAlarm').length,
       lAlarms: filtered.filter(d => d.ioName === 'LInAlarm').length,
       llAlarms: filtered.filter(d => d.ioName === 'LLInAlarm').length,
+      othersAlarms: filtered.filter(d => !limitTypes.includes(d.ioName)).length,
     };
   }, [filteredData]);
 
@@ -343,7 +353,7 @@ const RockwellAnalyzer = () => {
             </div>
 
             {/* Alarm Type Breakdown */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
               <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
                 <h4 className="text-slate-400 text-sm mb-1">HH Alarms</h4>
                 <p className="text-2xl font-bold text-red-400">{stats.hhAlarms}</p>
@@ -359,6 +369,10 @@ const RockwellAnalyzer = () => {
               <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
                 <h4 className="text-slate-400 text-sm mb-1">LL Alarms</h4>
                 <p className="text-2xl font-bold text-blue-400">{stats.llAlarms}</p>
+              </div>
+              <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                <h4 className="text-slate-400 text-sm mb-1">Outros</h4>
+                <p className="text-2xl font-bold text-purple-400">{stats.othersAlarms}</p>
               </div>
             </div>
 
@@ -385,43 +399,21 @@ const RockwellAnalyzer = () => {
                   </div>
                 </div>
 
-                {/* Alarm Type - Multiple Selection */}
+                {/* Alarm Type - Dropdown */}
                 <div>
                   <label className="block text-slate-400 text-sm mb-2">Tipo de Alarme</label>
-                  <div className="bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white">
-                    <div className="space-y-2">
-                      {[
-                        { value: 'HHInAlarm', label: 'HH Alarm', color: 'text-red-400' },
-                        { value: 'HInAlarm', label: 'H Alarm', color: 'text-orange-400' },
-                        { value: 'LInAlarm', label: 'L Alarm', color: 'text-yellow-400' },
-                        { value: 'LLInAlarm', label: 'LL Alarm', color: 'text-blue-400' }
-                      ].map(({ value, label, color }) => (
-                        <label key={value} className="flex items-center gap-2 cursor-pointer hover:bg-slate-800 rounded px-2 py-1">
-                          <input
-                            type="checkbox"
-                            checked={filters.alarmTypes.includes(value)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setFilters({...filters, alarmTypes: [...filters.alarmTypes, value]});
-                              } else {
-                                setFilters({...filters, alarmTypes: filters.alarmTypes.filter(t => t !== value)});
-                              }
-                            }}
-                            className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
-                          />
-                          <span className={`text-sm ${color}`}>{label}</span>
-                        </label>
-                      ))}
-                    </div>
-                    {filters.alarmTypes.length > 0 && (
-                      <button
-                        onClick={() => setFilters({...filters, alarmTypes: []})}
-                        className="mt-2 text-xs text-slate-400 hover:text-white transition-colors"
-                      >
-                        Limpar seleção
-                      </button>
-                    )}
-                  </div>
+                  <select
+                    value={filters.alarmType}
+                    onChange={(e) => setFilters({...filters, alarmType: e.target.value})}
+                    className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="HHInAlarm">HH Alarm</option>
+                    <option value="HInAlarm">H Alarm</option>
+                    <option value="LInAlarm">L Alarm</option>
+                    <option value="LLInAlarm">LL Alarm</option>
+                    <option value="others">Outros</option>
+                  </select>
                 </div>
 
                 {/* Enabled Status */}
