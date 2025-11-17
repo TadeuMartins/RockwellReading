@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { Upload, FileText, AlertCircle, CheckCircle, XCircle, Filter, Download, Search, Activity } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { Upload, FileText, AlertCircle, CheckCircle, XCircle, Filter, Download, Search, Activity, ChevronDown } from 'lucide-react';
 
 interface DataRow {
   id: number;
@@ -24,10 +24,51 @@ const RockwellAnalyzer = () => {
   const [processing, setProcessing] = useState(false);
   const [filters, setFilters] = useState({
     search: '',
-    alarmType: 'all', // Changed to single selection dropdown
+    alarmTypes: [] as string[], // Array for multi-selection
     enabledStatus: 'all',
     hasInterlock: 'all'
   });
+  const [isAlarmTypeDropdownOpen, setIsAlarmTypeDropdownOpen] = useState(false);
+  const alarmTypeDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (alarmTypeDropdownRef.current && !alarmTypeDropdownRef.current.contains(event.target as Node)) {
+        setIsAlarmTypeDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Helper functions for multi-select alarm type
+  const alarmTypeOptions = [
+    { value: 'HHInAlarm', label: 'HH Alarm' },
+    { value: 'HInAlarm', label: 'H Alarm' },
+    { value: 'LInAlarm', label: 'L Alarm' },
+    { value: 'LLInAlarm', label: 'LL Alarm' },
+    { value: 'others', label: 'Outros' }
+  ];
+
+  const toggleAlarmType = (value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      alarmTypes: prev.alarmTypes.includes(value)
+        ? prev.alarmTypes.filter(t => t !== value)
+        : [...prev.alarmTypes, value]
+    }));
+  };
+
+  const getAlarmTypeLabel = () => {
+    if (filters.alarmTypes.length === 0) return 'Todos';
+    if (filters.alarmTypes.length === 1) {
+      const option = alarmTypeOptions.find(o => o.value === filters.alarmTypes[0]);
+      return option?.label || 'Todos';
+    }
+    return `${filters.alarmTypes.length} selecionados`;
+  };
 
   // Processa os arquivos via API backend
   const processFiles = async () => {
@@ -125,15 +166,28 @@ const RockwellAnalyzer = () => {
         if (!matchesSearch) return false;
       }
 
-      // Filtro de tipo de alarme (seleção única)
-      if (filters.alarmType !== 'all') {
-        if (filters.alarmType === 'others') {
-          // "Outros" mostra itens que NÃO são dos tipos Limit
-          const limitTypes = ['HHInAlarm', 'HInAlarm', 'LInAlarm', 'LLInAlarm'];
-          if (limitTypes.includes(item.ioName)) {
-            return false;
-          }
-        } else if (item.ioName !== filters.alarmType) {
+      // Filtro de tipo de alarme (seleção múltipla)
+      if (filters.alarmTypes.length > 0) {
+        const limitTypes = ['HHInAlarm', 'HInAlarm', 'LInAlarm', 'LLInAlarm'];
+        
+        // Check if "Outros" is selected
+        const hasOthers = filters.alarmTypes.includes('others');
+        // Get specific alarm types (excluding "others")
+        const specificTypes = filters.alarmTypes.filter(t => t !== 'others');
+        
+        let matchesAlarmType = false;
+        
+        // If "Outros" is selected and item is not a limit type
+        if (hasOthers && !limitTypes.includes(item.ioName)) {
+          matchesAlarmType = true;
+        }
+        
+        // If any specific type matches
+        if (specificTypes.includes(item.ioName)) {
+          matchesAlarmType = true;
+        }
+        
+        if (!matchesAlarmType) {
           return false;
         }
       }
@@ -399,21 +453,47 @@ const RockwellAnalyzer = () => {
                   </div>
                 </div>
 
-                {/* Alarm Type - Dropdown */}
-                <div>
+                {/* Alarm Type - Multi-select Dropdown */}
+                <div ref={alarmTypeDropdownRef} className="relative">
                   <label className="block text-slate-400 text-sm mb-2">Tipo de Alarme</label>
-                  <select
-                    value={filters.alarmType}
-                    onChange={(e) => setFilters({...filters, alarmType: e.target.value})}
-                    className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                  <button
+                    type="button"
+                    onClick={() => setIsAlarmTypeDropdownOpen(!isAlarmTypeDropdownOpen)}
+                    className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500 flex items-center justify-between hover:bg-slate-850 transition-colors"
                   >
-                    <option value="all">Todos</option>
-                    <option value="HHInAlarm">HH Alarm</option>
-                    <option value="HInAlarm">H Alarm</option>
-                    <option value="LInAlarm">L Alarm</option>
-                    <option value="LLInAlarm">LL Alarm</option>
-                    <option value="others">Outros</option>
-                  </select>
+                    <span>{getAlarmTypeLabel()}</span>
+                    <ChevronDown className={`w-4 h-4 transition-transform ${isAlarmTypeDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {isAlarmTypeDropdownOpen && (
+                    <div className="absolute z-10 w-full mt-1 bg-slate-900 border border-slate-600 rounded-lg shadow-lg overflow-hidden">
+                      {alarmTypeOptions.map(option => (
+                        <label
+                          key={option.value}
+                          className="flex items-center gap-3 px-4 py-2 hover:bg-slate-800 cursor-pointer transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={filters.alarmTypes.includes(option.value)}
+                            onChange={() => toggleAlarmType(option.value)}
+                            className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 focus:ring-2"
+                          />
+                          <span className="text-white text-sm">{option.label}</span>
+                        </label>
+                      ))}
+                      {filters.alarmTypes.length > 0 && (
+                        <div className="border-t border-slate-700 p-2">
+                          <button
+                            type="button"
+                            onClick={() => setFilters({...filters, alarmTypes: []})}
+                            className="w-full text-sm text-blue-400 hover:text-blue-300 py-1"
+                          >
+                            Limpar seleção
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Enabled Status */}
