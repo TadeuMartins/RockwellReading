@@ -209,19 +209,22 @@ def parse_global_tags(l5k_text: str) -> Set[str]:
 
 def parse_interlocks(l5k_text: str,
                      aoi_instances: Dict[str, dict],
-                     global_tags: Set[str]) -> Dict[Tuple[str, str], Set[str]]:
+                     global_tags: Set[str]) -> Tuple[Dict[Tuple[str, str], Set[str]], Dict[Tuple[str, str], str]]:
     """
     Procura rungs do tipo:
 
         N: [XIC(TE1611001_ALM.HHInAlarm) ,XIO(...)]OTU(E1611AG01M1.Def.7);
+        RC: "Intertravamento 4 - Nivel baixo do TQ-0417TQ16";
 
-    e monta um mapa:
-        (instância, membro) -> { tags_de_saida }
+    e monta dois mapas:
+        1. (instância, membro) -> { tags_de_saida }
+        2. (instância, membro) -> nome_do_rung (texto do RC)
 
     Considera saída como "equipamento" quando o nome base (antes do '.')
     está na lista de TAGs globais.
     """
     interlocks: Dict[Tuple[str, str], Set[str]] = collections.defaultdict(set)
+    rung_names: Dict[Tuple[str, str], str] = {}
 
     rung_pattern = re.compile(
         r"N:\s*\[(.*?)\](OTE|OTU|OTL)\(([A-Za-z0-9_\.]+)\);",
@@ -236,6 +239,14 @@ def parse_interlocks(l5k_text: str,
             # Saída não é tag global → ignora como interbloqueio
             continue
 
+        # Procura o RC logo após o rung (pode estar algumas linhas abaixo)
+        # Procura até 500 caracteres após o final do rung
+        end_pos = m.end()
+        search_region = l5k_text[end_pos:end_pos + 500]
+        
+        rc_match = re.search(r'RC:\s*"([^"]+)"', search_region)
+        rung_comment = rc_match.group(1) if rc_match else ""
+
         # Encontra XIC/XIO dentro das condições
         for cm in re.finditer(r"XI[CO]\(([A-Za-z0-9_\.]+)\)", conds_str):
             ref = cm.group(1)
@@ -249,9 +260,15 @@ def parse_interlocks(l5k_text: str,
             if member not in {"HHInAlarm", "HInAlarm", "LInAlarm", "LLInAlarm"}:
                 continue
 
-            interlocks[(inst_name, member)].add(out_tag)
+            key = (inst_name, member)
+            interlocks[key].add(out_tag)
+            
+            # Armazena o comentário RC para esta combinação (instância, membro)
+            # Se já existe um comentário, mantém o primeiro encontrado
+            if key not in rung_names and rung_comment:
+                rung_names[key] = rung_comment
 
-    return interlocks
+    return interlocks, rung_names
 
 
 # ----------------------------
@@ -337,7 +354,7 @@ def process_data(l5k_text: str, df: pd.DataFrame) -> pd.DataFrame:
     aoi_defs = parse_aoi_definitions(l5k_text, alarm_aoi_types)
     instances = parse_aoi_instances(l5k_text, alarm_aoi_types)
     global_tags = parse_global_tags(l5k_text)
-    interlocks = parse_interlocks(l5k_text, instances, global_tags)
+    interlocks, rung_names = parse_interlocks(l5k_text, instances, global_tags)
 
     # Mapas I/O name -> parâmetro de limite e enabled
     alarm_to_limit = {
@@ -361,6 +378,11 @@ def process_data(l5k_text: str, df: pd.DataFrame) -> pd.DataFrame:
     # Ensure "Text 0" column has object dtype to avoid FutureWarning when assigning strings
     if "Text 0" in df_out.columns:
         df_out["Text 0"] = df_out["Text 0"].astype(object)
+    
+    # Add "Rung Name" column if it doesn't exist
+    if "Rung Name" not in df_out.columns:
+        df_out["Rung Name"] = ""
+        df_out["Rung Name"] = df_out["Rung Name"].astype(object)
 
     for idx, row in df_out.iterrows():
         block_type = str(row.get("Block type", ""))
@@ -397,6 +419,11 @@ def process_data(l5k_text: str, df: pd.DataFrame) -> pd.DataFrame:
         tags = sorted(interlocks.get((inst_name, io_name), []))
         if tags:
             df_out.at[idx, "Text 0"] = " / ".join(tags)
+        
+        # --- 4) RUNG NAME = comentário do rung (RC) ---
+        rung_name = rung_names.get((inst_name, io_name), "")
+        if rung_name:
+            df_out.at[idx, "Rung Name"] = rung_name
 
     return df_out
 

@@ -11,6 +11,7 @@ interface DataRow {
   value: number;
   signal: number;
   interlock: string;
+  rungName: string;
   identification: string;
   unit: string;
 }
@@ -120,6 +121,7 @@ const RockwellAnalyzer = () => {
           value: row.Value !== null && row.Value !== undefined ? row.Value : 0,
           signal: row.Signal !== null && row.Signal !== undefined ? row.Signal : 0,
           interlock: row['Text 0'] || '',
+          rungName: row['Rung Name'] || '',
           identification: row.Identification || '',
           unit: row.Unit || '',
         }));
@@ -159,6 +161,7 @@ const RockwellAnalyzer = () => {
           item.block.toLowerCase().includes(searchLower) ||
           item.ioName.toLowerCase().includes(searchLower) ||
           item.interlock.toLowerCase().includes(searchLower) ||
+          item.rungName.toLowerCase().includes(searchLower) ||
           item.chart.toLowerCase().includes(searchLower) ||
           item.hierarc.toLowerCase().includes(searchLower) ||
           item.identification.toLowerCase().includes(searchLower) ||
@@ -260,7 +263,7 @@ const RockwellAnalyzer = () => {
     if (filteredData.length === 0) return;
 
     // Headers as displayed in frontend (Portuguese)
-    const headers = ['Hierarc', 'Chart', 'Block', 'Alarme', 'Valor', 'Status', 'Interbloqueio', 'Identification', 'Unit'];
+    const headers = ['Hierarc', 'Chart', 'Block', 'Alarme', 'Valor', 'Status', 'Interbloqueio', 'Nome do Rung', 'Identification', 'Unit'];
     
     const csv = [
       headers.join(';'),
@@ -272,6 +275,7 @@ const RockwellAnalyzer = () => {
         row.value,
         row.signal === 1 ? 'Habilitado' : 'Desabilitado',
         row.interlock || '',
+        row.rungName || '',
         row.identification,
         row.unit
       ].join(';'))
@@ -557,6 +561,7 @@ const RockwellAnalyzer = () => {
                       <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Valor</th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Interbloqueio</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Nome do Rung</th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Identification</th>
                       <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Unit</th>
                     </tr>
@@ -593,6 +598,9 @@ const RockwellAnalyzer = () => {
                         </td>
                         <td className="px-6 py-4 text-sm text-slate-300">
                           {row.interlock || <span className="text-slate-500 italic">Nenhum</span>}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-slate-300">
+                          {row.rungName || <span className="text-slate-500 italic">-</span>}
                         </td>
                         <td className="px-6 py-4 text-sm text-slate-300">{row.identification}</td>
                         <td className="px-6 py-4 text-sm text-slate-400">{row.unit}</td>
